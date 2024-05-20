@@ -5,11 +5,12 @@ async function main() {
 
   console.log("Deploying contracts with the account:", deployer.address);
 
-  // Déployez le contrat NFTWithRoyalties avec les arguments nécessaires
-  const NFTWithRoyalties = await hre.ethers.getContractFactory("NFTWithRoyalties");
-  const nftWithRoyalties = await NFTWithRoyalties.deploy("MyNFTWithRoyalties", "MNFT");
-  await nftWithRoyalties.deployed();
-  console.log("NFTWithRoyalties deployed to:", nftWithRoyalties.address);
+  // Déployez le contrat NFTMarketplace.sol
+  const NFTWithRoyalties= await hre.ethers.getContractFactory("NFTWithRoyalties");
+  const nftwithroyalties = await NFTWithRoyalties.deploy();
+  await nftwithroyalties.deployed();
+  console.log("NFTMarketplace deployed to:", nftwithroyalties.address);
+  
 }
 
 main()

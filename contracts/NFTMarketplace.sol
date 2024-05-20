@@ -9,54 +9,95 @@ contract NFTMarketplace is ReentrancyGuard {
         uint256 tokenId;
         address seller;
         uint256 price;
+        address nftContract;
     }
 
-    mapping(uint256 => Offer) public offers;
-    IERC721 public nftContract;
+    Offer[] public offers;
 
-    event OfferCreated(uint256 indexed tokenId, address indexed seller, uint256 price);
-    event OfferCancelled(uint256 indexed tokenId, address indexed seller);
-    event NFTBought(uint256 indexed tokenId, address indexed buyer, address indexed seller, uint256 price);
+    event OfferCreated(uint256 indexed tokenId, address indexed seller, uint256 price, address indexed nftContract);
+    event OfferCancelled(uint256 indexed tokenId, address indexed seller, address indexed nftContract);
+    event NFTBought(uint256 indexed tokenId, address indexed buyer, address indexed seller, uint256 price, address nftContract);
 
-    constructor(address _nftContract) {
-        require(_nftContract != address(0), "Invalid NFT contract address");
-        nftContract = IERC721(_nftContract);
-    }
+    event Log(string message);
 
-    function createOffer(uint256 tokenId, uint256 price) external nonReentrant {
-        require(nftContract.ownerOf(tokenId) == msg.sender, "Only owner can create offer");
+    function createOffer(address nftContract, uint256 tokenId, uint256 price) external nonReentrant {
+        require(IERC721(nftContract).ownerOf(tokenId) == msg.sender, "Only owner can create offer");
         require(price > 0, "Price must be greater than zero");
 
-        nftContract.transferFrom(msg.sender, address(this), tokenId);
-        offers[tokenId] = Offer(tokenId, msg.sender, price);
+        emit Log("Passed owner and price checks");
 
-        emit OfferCreated(tokenId, msg.sender, price);
+        IERC721(nftContract).transferFrom(msg.sender, address(this), tokenId);
+        offers.push(Offer(tokenId, msg.sender, price, nftContract));
+
+        emit Log("NFT transferred and offer created");
+
+        emit OfferCreated(tokenId, msg.sender, price, nftContract);
     }
 
-    function cancelOffer(uint256 tokenId) external nonReentrant {
-        Offer memory offer = offers[tokenId];
+    function cancelOffer(uint256 tokenId, address nftContract) external nonReentrant {
+        Offer memory offer;
+        uint256 offerIndex;
+
+        // Find the offer
+        for (uint256 i = 0; i < offers.length; i++) {
+            if (offers[i].tokenId == tokenId && offers[i].nftContract == nftContract) {
+                offer = offers[i];
+                offerIndex = i;
+                break;
+            }
+        }
+
         require(offer.seller == msg.sender, "Only seller can cancel offer");
 
-        nftContract.transferFrom(address(this), msg.sender, tokenId);
-        delete offers[tokenId];
+        IERC721(nftContract).transferFrom(address(this), msg.sender, tokenId);
+        offers[offerIndex] = offers[offers.length - 1];
+        offers.pop();
 
-        emit OfferCancelled(tokenId, msg.sender);
+        emit OfferCancelled(tokenId, msg.sender, nftContract);
     }
 
-    function buyNFT(uint256 tokenId) external payable nonReentrant {
-        Offer memory offer = offers[tokenId];
+    function buyNFT(uint256 tokenId, address nftContract) external payable nonReentrant {
+        Offer memory offer;
+        uint256 offerIndex;
+
+        // Find the offer
+        for (uint256 i = 0; i < offers.length; i++) {
+            if (offers[i].tokenId == tokenId && offers[i].nftContract == nftContract) {
+                offer = offers[i];
+                offerIndex = i;
+                break;
+            }
+        }
+
         require(offer.price > 0, "NFT not for sale");
         require(msg.value == offer.price, "Incorrect price");
 
-        nftContract.transferFrom(address(this), msg.sender, tokenId);
-        payable(offer.seller).transfer(msg.value);
-        delete offers[tokenId];
+        emit Log("Passed sale checks");
 
-        emit NFTBought(tokenId, msg.sender, offer.seller, offer.price);
+        IERC721(nftContract).transferFrom(address(this), msg.sender, tokenId);
+        payable(offer.seller).transfer(msg.value);
+        offers[offerIndex] = offers[offers.length - 1];
+        offers.pop();
+
+        emit NFTBought(tokenId, msg.sender, offer.seller, offer.price, nftContract);
     }
 
-    function getOffer(uint256 tokenId) external view returns (Offer memory) {
-        return offers[tokenId];
+    function getOffers() external view returns (Offer[] memory) {
+        return offers;
+    }
+
+    function getOffer(uint256 tokenId, address nftContract) external view returns (Offer memory) {
+        for (uint256 i = 0; i < offers.length; i++) {
+            if (offers[i].tokenId == tokenId && offers[i].nftContract == nftContract) {
+                return offers[i];
+            }
+        }
+        revert("Offer not found");
     }
 }
+
+
+
+
+
 
